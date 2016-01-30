@@ -1,19 +1,18 @@
 package main.scala.com.kucharz.patryk.mgr.actors
 
-import com.kucharz.patryk.mgr.messages.{FrequentItemsetMessage, StartMessage, AssotiationRuleMessage, TransactionMessage}
-import com.kucharz.patryk.mgr.model.{AssotiationRule, Itemset}
-import main.scala.com.kucharz.patryk.mgr.algorithm.Apriori
+import com.kucharz.patryk.mgr.messages._
+import com.kucharz.patryk.mgr.model.{Itemset}
 import main.scala.com.kucharz.patryk.mgr.scenarios.MultiNodeScenario
 
 import scala.collection.mutable.ListBuffer
 
-class AllToAllFrequentItemsetsLevelSlave (override val id : Int, override val scenario : MultiNodeScenario) extends Slave (id, scenario)  {
+class AllToAllFrequentItemsetsLevelSlave (override val id : Int, override val scenario : MultiNodeScenario, override val logEnabled : Boolean = false) extends Slave (id, scenario, logEnabled)  {
 
   val items = new ListBuffer[Itemset]
   var counter = 0
 
   override def initialize(): Unit = {
-
+    scenario.manager ! HelloSlave
   }
 
   override def process(): Unit = {
@@ -26,12 +25,19 @@ class AllToAllFrequentItemsetsLevelSlave (override val id : Int, override val sc
 
   override def receive() = {
     case tm : TransactionMessage =>
+      log("AllToAllFrequentItemsetsLevelSlave:receive:TransactionMessage")
       items.appendAll(tm.itemsets)
       counter += 1
-      if(counter == getSlaves.size) {
+      if(counter == scenario.numberOfNodes) {
         master ! FrequentItemsetMessage(generateFrequentItemsets())
       }
-    case StartMessage => process()
+    case StartMessage =>
+      log("AllToAllFrequentItemsetsLevelSlave:receive:StartMessage")
+      process()
+    case ByeMessage =>
+      log("AllToAllFrequentItemsetsLevelSlave:receive:ByeMessage")
+      sender() ! SlaveByeMessage
+      context.stop(self)
   }
 
   def generateFrequentItemsets() : List[Itemset] = {

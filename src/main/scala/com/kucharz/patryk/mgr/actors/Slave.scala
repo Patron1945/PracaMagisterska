@@ -2,13 +2,13 @@ package main.scala.com.kucharz.patryk.mgr.actors
 
 import akka.actor.Actor
 import com.kucharz.patryk.mgr.algorithm.BruteApriori
-import com.kucharz.patryk.mgr.messages.{StartMessage, ByeMessage}
+import com.kucharz.patryk.mgr.messages.{HelloSlave, SlaveByeMessage, StartMessage, ByeMessage}
 import com.kucharz.patryk.mgr.model.Itemset
 import com.kucharz.patryk.mgr.utils.{FileReader, Parser}
 import main.scala.com.kucharz.patryk.mgr.algorithm.{Apriori, TrieApriori}
 import main.scala.com.kucharz.patryk.mgr.scenarios.{MultiNodeScenario}
 
-abstract class Slave(val id : Int, val scenario : MultiNodeScenario) extends Actor {
+abstract class Slave(val id : Int, val scenario : MultiNodeScenario, val logEnabled : Boolean) extends Actor {
 
   val master = scenario.master
   val slaves = scenario.slaves
@@ -17,7 +17,9 @@ abstract class Slave(val id : Int, val scenario : MultiNodeScenario) extends Act
   initialize()
 
   override def receive: Receive = {
-    case ByeMessage => context.stop(self)
+    case ByeMessage =>
+      sender() ! SlaveByeMessage
+      context.stop(self)
     case StartMessage => process()
   }
 
@@ -36,8 +38,10 @@ abstract class Slave(val id : Int, val scenario : MultiNodeScenario) extends Act
 
   def getSlaves = scenario.slaves
 
-  def initialize()
+  def initialize() : Unit = scenario.manager ! HelloSlave
 
   def process()
+
+  def log(message : String) = if(logEnabled) println(message)
 
 }

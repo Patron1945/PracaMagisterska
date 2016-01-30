@@ -1,28 +1,37 @@
 package main.scala.com.kucharz.patryk.mgr.actors
 
 import com.kucharz.patryk.mgr.actors.Master
-import com.kucharz.patryk.mgr.messages.{ByeMessage, AssotiationRuleMessage}
+import com.kucharz.patryk.mgr.messages._
 import com.kucharz.patryk.mgr.model.{Itemset, AssotiationRule}
 import main.scala.com.kucharz.patryk.mgr.scenarios.MultiNodeScenario
 
 import scala.collection.mutable.ListBuffer
 
-class AssotiationRuleLevelMaster (override val scenario: MultiNodeScenario)
-  extends Master(scenario) {
+class AssotiationRuleLevelMaster (override val scenario: MultiNodeScenario) extends Master(scenario) {
 
   private val rules: ListBuffer[AssotiationRule] = new ListBuffer[AssotiationRule]
+  scenario.manager ! HelloMaster
 
   override def receive: Receive = {
     case arm : AssotiationRuleMessage =>
+      println("AssotiationRuleLevelMaster:receive:AssotiationRuleMessage")
       listOfActors.append(sender())
+      println("RECEICED: " + arm)
       arm.assotiationRules.foreach(appendToList(_))
       counter += 1;
       if (counter == scenario.numberOfNodes) {
-        println("RESULTS: " + rules.filter(_.getConfidence > scenario.minimal_confidence))
-        listOfActors.foreach(_ ! ByeMessage)
-        context.stop(self)
-        context.system.shutdown()
+        val results = rules.filter(_.getConfidence > scenario.minimal_confidence)
+        scenario.manager ! ResultMessage(results.toList)
       }
+    case ByeMessage =>
+      println("AssotiationRuleLevelMaster:receive:ByeMessage")
+      sender() ! MasterByeMessage
+      context.stop(self)
+    case sarm : SequenceAssotiationRuleMessage =>
+      println("AssotiationRuleLevelMaster:receive:SequenceAssotiationRuleMessage")
+      sarm.list.foreach(appendToList(_))
+      val results = rules.filter(_.getConfidence > scenario.minimal_confidence)
+      scenario.manager ! ResultMessage(results.toList)
   }
 
   def appendToList(rule : AssotiationRule) = {
